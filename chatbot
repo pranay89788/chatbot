@@ -1,0 +1,98 @@
+import streamlit as st
+from streamlit_chat import message
+import openai
+import os
+import docx
+from fpdf import FPDF
+
+# Initialize OpenAI API Key
+openai.api_key = "YOUR_OPENAI_API_KEY"
+
+# Function to interact with OpenAI for chatbot responses
+def get_chatbot_response(user_input):
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=user_input,
+        max_tokens=150
+    )
+    return response.choices[0].text.strip()
+
+# Function to parse CV from uploaded file
+def parse_cv(file):
+    if file.type == "application/pdf":
+        # Add PDF parsing logic if needed
+        st.write("PDF Parsing is not implemented yet.")
+    elif file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        # Parse .docx file
+        doc = docx.Document(file)
+        text = ""
+        for para in doc.paragraphs:
+            text += para.text + "\n"
+        return text
+    else:
+        return "Unsupported file type."
+
+# Function to create a simple resume
+def create_resume(name, education, skills, experience):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    
+    # Add resume details
+    pdf.cell(200, 10, txt=f"Resume: {name}", ln=True, align='C')
+    pdf.cell(200, 10, txt=f"Education: {education}", ln=True)
+    pdf.cell(200, 10, txt=f"Skills: {skills}", ln=True)
+    pdf.cell(200, 10, txt=f"Experience: {experience}", ln=True)
+
+    # Save to file
+    resume_path = f"{name}_resume.pdf"
+    pdf.output(resume_path)
+    return resume_path
+
+# Streamlit UI
+st.title("Job Application Chatbot")
+
+# Sidebar for job or internship options
+option = st.sidebar.selectbox("Choose Option", ["Job Application", "Internship Application", "Resume Builder", "CV Upload"])
+
+if option == "Job Application" or option == "Internship Application":
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # Display chat messages
+    for msg in st.session_state.messages:
+        message(msg["text"], is_user=msg["is_user"])
+
+    # User input for chatbot interaction
+    user_input = st.text_input("You: ", "")
+    if user_input:
+        st.session_state.messages.append({"text": user_input, "is_user": True})
+        bot_response = get_chatbot_response(user_input)
+        st.session_state.messages.append({"text": bot_response, "is_user": False})
+
+elif option == "Resume Builder":
+    st.subheader("Create Your Resume")
+    
+    name = st.text_input("Name")
+    education = st.text_area("Education")
+    skills = st.text_area("Skills")
+    experience = st.text_area("Work Experience")
+    
+    if st.button("Generate Resume"):
+        if name and education and skills and experience:
+            resume_path = create_resume(name, education, skills, experience)
+            st.success(f"Resume Created! Download your resume [here](/{resume_path}).")
+        else:
+            st.error("Please fill in all the fields.")
+
+elif option == "CV Upload":
+    st.subheader("Upload Your CV")
+    uploaded_file = st.file_uploader("Upload CV (PDF/Word)", type=["pdf", "docx"])
+    
+    if uploaded_file is not None:
+        cv_text = parse_cv(uploaded_file)
+        st.write("Extracted Text from CV:")
+        st.text_area("CV Content", cv_text, height=200)
+
+# Run the app using: streamlit run your_script.py
